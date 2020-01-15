@@ -1,9 +1,22 @@
 var chai = require('chai'), chaiHttp = require('chai-http');
-
+var TodoItem = require('../api/model/todoItem');
 chai.use(chaiHttp);
 var expect = chai.expect;
-
+var mongoose = require('mongoose');
+var app = mongoose.connect('mongoose://localhost:3000/todoitems');
+const db = mongoose.connection;
+ 
 describe('Test GET POST PUT DEL of API-TESTING-TEST', function() {
+  before(function (done) {
+    mongoose.connect('mongodb://localhost:3000/todoitems');
+    const db = mongoose.connection;
+    db.on('error', console.error.bind(console, 'connection error'));
+    db.once('open', function() {
+      console.log('We are connected to test database!');
+      done();
+    });
+  });
+
   it('Response should be 200 if URL is correct', function() {   
     chai.request('http://localhost:3000/todoitems')
     .get('/')
