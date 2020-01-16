@@ -1,79 +1,128 @@
+const mongoose = require('mongoose');
 var chai = require('chai'), chaiHttp = require('chai-http');
-var TodoItem = require('../api/model/todoItem');
 chai.use(chaiHttp);
-var expect = chai.expect;
-var mongoose = require('mongoose');
-var app = mongoose.connect('mongoose://localhost:3000/todoitems');
-const db = mongoose.connection;
- 
-describe('Test GET POST PUT DEL of API-TESTING-TEST', function() {
-  before(function (done) {
-    mongoose.connect('mongodb://localhost:3000/todoitems');
-    const db = mongoose.connection;
-    db.on('error', console.error.bind(console, 'connection error'));
-    db.once('open', function() {
-      console.log('We are connected to test database!');
+const should = chai.should();
+const expect = chai.expect;
+const server = require('../index');
+const todoItems = require('../api/model/TodoItem');
+const TodoItem = mongoose.model('TodoItem', todoItems);
+
+describe('Test suite for API testing', function() {
+  beforeEach((done) => {
+    TodoItem.remove({}, () => {
       done();
     });
   });
-
-  it('Response should be 200 if URL is correct', function() {   
-    chai.request('http://localhost:3000/todoitems')
-    .get('/')
+// ->> 1
+  it('Response should be 200 if URL is correct with a GET request', function(done) {
+    chai.request(server)
+    .get('/todoitems')
     .end(function(err, res) {
-      expect(res).to.have.status(200); 
+      expect(res).to.have.status(200);
+      res.should.be.json;
+      done();
     });
   });
-  
-  it('Response should be 404 if URL is incorrect', function() {   
-    chai.request('http://localhost:3000/todoitemss')
-    .get('/')
+// -->> 2
+  it('Response should be 404 if URL is incorrect with a bad GET request', function(done) {
+    chai.request(server)
+    .get('/todoitemss')
     .end(function(err, res) {
-      expect(res).to.have.status(404); 
+      expect(res).to.have.status(404);
+      done();
     });
   });
-  
-  it('Response should be 200 if post data to good URL', function() {   
+// -->> 3
+  it('Response should be 200 with a POST request', function(done) {
+    const param = {
+      name: 'Ma tache',
+      status: 'done'
+    };
     chai.request('http://localhost:3000/todoitems')
     .post('/')
-    .send({
-      'name': 'ma tâche',
-      'status': 'done'
-    })
+    .send(param)
     .end(function(err, res) {
-      expect(res).to.have.status(200); 
+      expect(res).to.have.status(200);
+      res.should.be.json;
+      res.body.name.should.eql(param.name);
+      res.body.status.should.eql(param.status);
+      done();
     });
   });
-  
-  it('Response should be 200 if update data', function() {   
-    chai.request('http://localhost:3000/todoitems/')
-    .put('5e1c8da6765871cc38b983ad')
-    .send({ 
-      "name": "tâche update", 
-      "status" : "in progress"
-     })
-     .end(function(err, res) {
-      expect(res).to.have.status(200); 
+  // -->> 3.1
+    it('Response should be 500 with a bad POST request', function(done) {
+      const param = {
+        name: 'Ma tache updated',
+        status: 'don'
+      };
+      chai.request(server)
+      .post('/todoitems')
+      .send(param)
+      .end(function(err, res) {
+        expect(res).to.have.status(500);
+        res.body.should.be.a('object');
+        res.should.be.json;
+        done();
+      });
+    });
+// -->> 4
+  it('Response should be 200 with an UPDATE request', function(done) {
+    const item = new TodoItem({
+      name: 'Ma tache',
+      status: 'inProgress'
+    });
+    const param = {
+      name: 'Ma tache updated',
+      status: 'done'
+    };
+    item.save(() => {
+      chai.request(server)
+        .put('/todoitems/' + item._id)
+        .send(param)
+        .end(function(err, res) {
+          expect(res).to.have.status(200);
+          res.should.be.json;
+          TodoItem.find({}, (err, items) => {
+            items[0].name.should.eql(param.name);
+            items[0].status.should.eql(param.status);
+            done();
+          });
+        });
+      });
+    });
+// -->> 5
+  it('Response should be 200 with a DELETE request', function(done) {
+    const aTodoItem = new TodoItem({
+      name: 'firstTask',
+      status: 'inProgress'
+    });
+    aTodoItem.save((err, savedTodoItem) => {
+      chai.request(server)
+      .delete('/todoitems/' + savedTodoItem._id)
+      .end((err, res) => {
+        res.should.have.status(200);
+        res.body.should.be.a('object');
+        TodoItem.find({}, (err, res) => {
+          res.length.should.eql(0);
+        });
+        done();
+      });
     });
   });
-  
-  it('Response should be 200 if delete data', function() {   
-    chai.request('http://localhost:3000/todoitems/')
-    .del('5e1d7ec24964aad94a1b66aa')
-    .send({ 
-      "name": "tâche update", 
-      "status" : "in progress"
-     })
+// -->> 6
+  it('Response should be a JSON with a POST request', function(done) {
+    const param = {
+      name: 'Ma tache',
+      status: 'done'
+    };
+    chai.request(server)
+    .post('/todoitems')
+    .send(param)
      .end(function(err, res) {
-      expect(res).to.have.status(200); 
-    });
-  });
-  
-  it('Response should be JSON', function() {   
-    chai.request('http://localhost:3000/todoitems/')
-    .get('/')
-     .end(function(err, res) {
-      expect(res).to.be.json;; 
+      expect(res).to.be.json;
+      expect(res.body.name).to.equal('Ma tache');
+      expect(res.body.status).to.equal('done');
+      done();
     });
   });
 });
